@@ -333,7 +333,11 @@ class MxFarm
     viewer_self = mixi.get_viewer_self
     birth_datetime = ""
     if viewer_self["dateOfBirth"]
-      birth_datetime = Time.parse(viewer_self["dateOfBirth"]).strftime("%a %b %d %Y %H:%M:%S GMT+0900")
+      begin
+        birth_datetime = Time.parse(viewer_self["dateOfBirth"]).strftime("%a %b %d %Y %H:%M:%S GMT+0900")
+      rescue => e
+        @log.debug "cannot parse dateOfBirth: %s, exception: %s" % [viewer_self["dateOfBirth"], e.to_s]
+      end
     end
     return {
       :viewer_id => viewer_self["id"],
