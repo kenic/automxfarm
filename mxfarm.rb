@@ -649,7 +649,7 @@ class MxFarm
       next if fold["increment_fruit"] >= 25
       @log.info "[fold.friend.scare] mixi: %s, fold_id: %d, animal_type: %s" % [friend_name(friend_id), index, fold["animal_type"]]
       result = call_api("fold.friend.scare", :friend_id => friend_id, :land_index => index)
-      if result["return_code"] == 2
+      if result["return_code"] == 3
         @no_more_scare = true
       end
     end
