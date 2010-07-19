@@ -34,11 +34,11 @@ require "rubygems"
 require "mechanize"
 require "json"
 
-Version = "0.0.3"
-MY_USER_AGENT = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_2; ja-jp) AppleWebKit/531.21.8 (KHTML, like Gecko) Version/4.0.4 Safari/531.21.10"
+Version = "0.0.4"
+MY_USER_AGENT = "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_3; ja-jp) AppleWebKit/531.22.7 (KHTML, like Gecko) Version/4.0.5 Safari/531.22.7"
 
 def encode_query(query)
-  WWW::Mechanize::Util.build_query_string(query)
+  Mechanize::Util.build_query_string(query)
 end
 
 class Queue
@@ -84,7 +84,6 @@ class Queue
       return @list.slice!(0, num)
     end
   end
-
 end
 
 
@@ -116,12 +115,13 @@ class Mixi
   attr_reader :my_id, :session_value
 
   def initialize(email, password)
-    @agent = WWW::Mechanize.new { |a|
+    @agent = Mechanize.new { |a|
       a.user_agent = MY_USER_AGENT
       a.follow_meta_refresh = true
     }
     @agent.get "http://mixi.jp/"
     @agent.page.form_with(:name => "login_form") do |f|
+      f.field_with(:name => "next_url").value = "home.pl"
       f.field_with(:name => "email").value = email
       f.field_with(:name => "password").value = password
       f.click_button
@@ -192,23 +192,7 @@ class Mixi
   end
 
   def get_session_value(gadget, url, post_data)
-    def make_form(query)
-      node = {}
-      # Create a fake form
-      class << node
-        def search(*args)
-          []
-        end
-      end
-      node["method"] = "POST"
-      node["enctype"] = "application/x-www-form-urlencoded"
-      form = WWW::Mechanize::Form.new(node)
-      query.each do |k, v|
-        form.fields << WWW::Mechanize::Form::Field.new(k.to_s, v)
-      end
-      form
-    end
-    form = make_form({
+    query = {
       "authz" => "signed",
       "bypassSpecCache" => "",
       "container" => "default",
@@ -223,12 +207,12 @@ class Mixi
       "signViewer" => "true",
       "st" => @session_token,
       "url" => url,
-    })
+    }
     request_uri = URI::HTTP.build({
       :host => @agent.page.uri.host,
       :path => "/gadgets/makeRequest",
     })
-    @agent.send(:post_form, request_uri, form, { "X-Mixi-Platform-IO" => "1" })
+    @agent.post(request_uri, query, { "X-Mixi-Platform-IO" => "1" })
     dont_be_evil = @agent.page.body
     unless dont_be_evil =~ /\\"session_value\\": \\"(\w+)\\"/
       return nil
@@ -249,7 +233,7 @@ class MxFarm
     @log = logger
     @options = options
     ## Use net/http instead of mechanize for speeding up
-    # @agent = WWW::Mechanize.new { |a| a.user_agent = MY_USER_AGENT }
+    # @agent = Mechanize.new { |a| a.user_agent = MY_USER_AGENT }
     @http = Net::HTTP.new("mxfarm.rekoo.com")
     @friend_list = {}
   end
@@ -333,11 +317,7 @@ class MxFarm
     viewer_self = mixi.get_viewer_self
     birth_datetime = ""
     if viewer_self["dateOfBirth"]
-      begin
-        birth_datetime = Time.parse(viewer_self["dateOfBirth"]).strftime("%a %b %d %Y %H:%M:%S GMT+0900")
-      rescue => e
-        @log.debug "cannot parse dateOfBirth: %s, exception: %s" % [viewer_self["dateOfBirth"], e.to_s]
-      end
+      birth_datetime = Time.parse(viewer_self["dateOfBirth"]).strftime("%a %b %d %Y %H:%M:%S GMT+0900")
     end
     return {
       :viewer_id => viewer_self["id"],
@@ -649,7 +629,7 @@ class MxFarm
       next if fold["increment_fruit"] >= 25
       @log.info "[fold.friend.scare] mixi: %s, fold_id: %d, animal_type: %s" % [friend_name(friend_id), index, fold["animal_type"]]
       result = call_api("fold.friend.scare", :friend_id => friend_id, :land_index => index)
-      if result["return_code"] == 3
+      if result["return_code"] == 2
         @no_more_scare = true
       end
     end
